@@ -69,12 +69,12 @@ class GraphView:
         for i in range(len(temp)):
             self.ax.text(temp[i], wind[i], str(time[i]), fontsize=7, ha='left', va='bottom', color='black')
 
-        # Top axis (RH vs Index for layout only)
-        self.ax_rh.scatter(rh, wind, color='blue')
+        # # Top axis (RH vs Index for layout only)
+        # self.ax_rh.scatter(rh, wind, color='blue')
         self.ax_rh.set_xlim(*self.padded_limits(rh))
-
-        # Right axis (Fuel vs Wind)
-        self.ax_fuel.scatter(wind, fuel, color='blue')
+        #
+        # # Right axis (Fuel vs Wind)
+        # self.ax_fuel.scatter(wind, fuel, color='blue')
         self.ax_fuel.set_ylim(*self.padded_limits(fuel))
         self.ax_fuel.set_xlim(*self.padded_limits(wind))
 
