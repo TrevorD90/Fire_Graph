@@ -1,52 +1,51 @@
-import re
+# app/Data_Loader.py
+import os
 import pandas as pd
 
-def _norm(s: str) -> str:
-    """Normalize header: lower, strip, remove non-alnum except %."""
-    return re.sub(r"[^a-z0-9%]+", "", str(s).lower().strip())
-
-def _find_col(df: pd.DataFrame, candidates) -> str | None:
-    """Find a column by normalized name or prefix match."""
-    canon = {_norm(c): c for c in df.columns}
-    for wanted in candidates:
-        w = _norm(wanted)
-        if w in canon:
-            return canon[w]
-    for k, orig in canon.items():
-        if any(k.startswith(_norm(w)) for w in candidates):
-            return orig
-    return None
-
 def load_csv_mapped(path: str) -> pd.DataFrame:
+    """
+    Load a CSV and normalize column names to match the expected schema:
+      - Temperature   -> x1
+      - Wind Speed    -> y1
+      - Relative Humidity -> x2
+      - Fuel Moisture -> y2
+      - Time          -> time
+    Case- and space-insensitive.
+    """
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"CSV not found at: {path}")
+
     df = pd.read_csv(path)
 
-    # Map your headers → canonical names
-    col_time = _find_col(df, ["time", "timestamp", "date/time"])
-    col_temp = _find_col(df, ["temperature", "temp", "temperaturef", "temperature°f"])
-    col_wind = _find_col(df, ["windspeed", "wind speed", "wind(mph)", "wind"])
-    col_rh   = _find_col(df, ["relativehumidity", "relative humidity", "rh", "relativehumidity%"])
-    col_fm   = _find_col(df, ["fuelmoisture", "fuel moisture", "fm"])
+    # Normalize headers
+    lower_cols = {c.lower().strip(): c for c in df.columns}
 
+    # Define required logical names and their canonical mappings
+    mapping = {
+        "time": ["time", "timestamp"],
+        "x1": ["temperature", "temp", "x1"],
+        "y1": ["wind speed", "windspeed", "wind", "y1"],
+        "x2": ["relative humidity", "humidity", "rh", "x2"],
+        "y2": ["fuel moisture", "moisture", "y2"],
+    }
+
+    rename_map = {}
     missing = []
-    if not col_time: missing.append("Time")
-    if not col_temp: missing.append("Temperature")
-    if not col_wind: missing.append("Wind Speed")
-    if not col_rh:   missing.append("Relative Humidity")
-    if not col_fm:   missing.append("Fuel Moisture")
+    for canonical, options in mapping.items():
+        found = None
+        for opt in options:
+            if opt in lower_cols:
+                found = lower_cols[opt]
+                break
+        if found:
+            rename_map[found] = canonical
+        else:
+            missing.append(canonical)
+
     if missing:
         raise ValueError(
-            "Missing required columns (case-insensitive): " + ", ".join(missing) +
-            f"\nFound: {list(df.columns)}"
+            f"CSV must contain columns for {missing}. Found columns: {list(df.columns)}"
         )
 
-    df = df.rename(columns={
-        col_time: "time",
-        col_temp: "x1",   # Temperature → X1
-        col_wind: "y1",   # Wind Speed → Y1
-        col_rh:   "x2",   # Relative Humidity → X2
-        col_fm:   "y2",   # Fuel Moisture → Y2
-    })
-    for c in ["x1", "y1", "x2", "y2"]:
-        df[c] = pd.to_numeric(df[c], errors="coerce")
-    df = df.dropna(subset=["x1", "y1", "x2", "y2"])
-    return df[["time", "x1", "y1", "x2", "y2"]]
+    df = df.rename(columns=rename_map)
+    return df
