@@ -1,5 +1,6 @@
 # app/Plot_View.py
 import tkinter as tk
+from tkinter import filedialog, messagebox
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 
@@ -11,10 +12,10 @@ class PlotFrame(tk.Frame):
     Embeds a Matplotlib plot in Tk.
 
     Features:
-      • Mouse wheel zoom (centered at cursor) — smooth and jitter-free
-      • Native toolbar pan/zoom — smooth; we only do a full redraw on mouse release
-      • Reset View — snaps back to data-driven extents
-      • Lines are anchored in data/world coordinates (handled in Plotter.draw)
+      • Mouse wheel zoom (centered at cursor)
+      • Native toolbar pan/zoom (smooth; we redraw once on mouse-up)
+      • Reset View
+      • Export PNG snapshot (Save As...)
     """
     def __init__(self, parent, state: AppState):
         super().__init__(parent, bg="white")
@@ -35,7 +36,6 @@ class PlotFrame(tk.Frame):
 
         # Events
         self.canvas.mpl_connect("scroll_event", self._on_scroll)
-        # When user finishes a toolbar pan/zoom, do one full redraw to sync secondary axes
         self.canvas.mpl_connect("button_release_event", self._on_mouse_release)
 
     # ---------------- Public API ----------------
@@ -55,6 +55,33 @@ class PlotFrame(tk.Frame):
         self.state.x_min_manual = self.state.x_max_manual = None
         self.state.y_min_manual = self.state.y_max_manual = None
         self.redraw()
+
+    def save_png(self):
+        """Open a Save dialog and export the current figure as a PNG."""
+        default_name = "plot_snapshot.png"
+        path = filedialog.asksaveasfilename(
+            parent=self,
+            title="Export PNG",
+            defaultextension=".png",
+            initialfile=default_name,
+            filetypes=[("PNG Image", "*.png")],
+        )
+        if not path:
+            return
+        try:
+            # Use a higher DPI and tight bbox for crisp output.
+            # Use figure facecolor to match what you see; axes facecolor is retained.
+            self.figure.savefig(
+                path,
+                dpi=300,
+                bbox_inches="tight",
+                facecolor=self.figure.get_facecolor(),
+                edgecolor="none",
+                transparent=False,  # set True if you want transparent figure bg
+            )
+            messagebox.showinfo("Export PNG", f"Saved snapshot to:\n{path}")
+        except Exception as e:
+            messagebox.showerror("Export PNG", f"Failed to save PNG:\n{e}")
 
     # ---------------- Event handlers ----------------
     def _on_scroll(self, event):
@@ -91,14 +118,12 @@ class PlotFrame(tk.Frame):
         If the Matplotlib toolbar was in pan or zoom mode, commit current limits
         and do ONE full redraw to sync mirrored top/right axes and labels.
         """
-        # NavigationToolbar2Tk.mode is '' (empty) when idle; values like 'pan/zoom' or 'zoom rect' when active
         try:
             mode = getattr(self.toolbar, "mode", "")
         except Exception:
             mode = ""
 
         if mode:  # only act if a toolbar interaction just happened
-            # Capture current limits and redraw once
             xlim = self.ax.get_xlim()
             ylim = self.ax.get_ylim()
             self.state.use_manual_axes = True

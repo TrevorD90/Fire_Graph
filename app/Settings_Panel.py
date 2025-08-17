@@ -6,37 +6,50 @@ from .Data_Loader import load_csv_mapped
 from .Plotter import compute_bounds
 
 class SettingsPanel(tk.Frame):
-    def __init__(self, parent, state: AppState, on_redraw, reset_view_cb=None):
-        super().__init__(parent, bg="#f6f6f6", padx=10, pady=10, width=320)
+    def __init__(self, parent, state: AppState, on_redraw, reset_view_cb=None, save_png_cb=None):
+        super().__init__(parent, bg="#f6f6f6", padx=10, pady=10, width=340)
         self.state = state
         self.on_redraw = on_redraw
         self.reset_view_cb = reset_view_cb
+        self.save_png_cb = save_png_cb
 
-        # toggles
-        self.var_show_x1y1 = tk.BooleanVar(value=state.show_x1y1)
-        self.var_show_x2y2 = tk.BooleanVar(value=state.show_x2y2)
-        self.var_show_time = tk.BooleanVar(value=state.show_time_labels)
-        self.var_show_grid = tk.BooleanVar(value=state.show_grid)
-        self.var_use_manual = tk.BooleanVar(value=state.use_manual_axes)
+        # UI state vars
+        self.var_show_x1y1   = tk.BooleanVar(value=state.show_x1y1)
+        self.var_show_x2y2   = tk.BooleanVar(value=state.show_x2y2)
+        self.var_show_time   = tk.BooleanVar(value=state.show_time_labels)
+        self.var_show_grid   = tk.BooleanVar(value=state.show_grid)
+        self.var_use_manual  = tk.BooleanVar(value=state.use_manual_axes)
 
         ttk.Label(self, text="Settings", font=("Segoe UI", 12, "bold")).pack(anchor="w", pady=(0, 8))
 
-        # file chooser
+        # File chooser
         ttk.Button(self, text="Choose CSV…", command=self.choose_csv).pack(anchor="w", pady=4)
         self.path_lbl = ttk.Label(self, text="(no file)")
         self.path_lbl.pack(anchor="w")
 
         ttk.Separator(self, orient="horizontal").pack(fill="x", pady=8)
 
-        # toggles
+        # Toggles
         ttk.Checkbutton(self, text="Show Temp/Wind (X1–Y1)",
                         variable=self.var_show_x1y1, command=self._toggle_points).pack(anchor="w")
         ttk.Checkbutton(self, text="Show RH/Fuel (X2–Y2)",
                         variable=self.var_show_x2y2, command=self._toggle_points).pack(anchor="w")
-        ttk.Checkbutton(self, text="Show time labels",
-                        variable=self.var_show_time, command=self._toggle_time).pack(anchor="w")
+
+        row_time = ttk.Frame(self); row_time.pack(fill="x", pady=(2,0))
+        ttk.Checkbutton(row_time, text="Show time labels",
+                        variable=self.var_show_time, command=self._toggle_time).pack(side="left")
+        ttk.Label(row_time, text="Step (nth):").pack(side="left", padx=(8,4))
+        self.time_step_var = tk.IntVar(value=max(1, int(self.state.time_label_step or 1)))
+        sp = ttk.Spinbox(row_time, from_=1, to=200, width=5,
+                         textvariable=self.time_step_var,
+                         command=self._time_step_changed)
+        sp.pack(side="left")
+        # also update when user types and hits Enter or leaves field
+        sp.bind("<Return>", lambda e: self._time_step_changed())
+        sp.bind("<FocusOut>", lambda e: self._time_step_changed())
+
         ttk.Checkbutton(self, text="Show grid",
-                        variable=self.var_show_grid, command=self._toggle_grid).pack(anchor="w")
+                        variable=self.var_show_grid, command=self._toggle_grid).pack(anchor="w", pady=(4,0))
 
         # -------- Zoom / Axis ranges (manual) --------
         ttk.Separator(self, orient="horizontal").pack(fill="x", pady=8)
@@ -49,13 +62,12 @@ class SettingsPanel(tk.Frame):
         ttk.Label(axes, text="Y min").grid(row=2, column=0, sticky="w", pady=(4,0))
         ttk.Label(axes, text="Y max").grid(row=2, column=1, sticky="w", pady=(4,0))
 
-        # entries for manual axes (we will prefill from CSV extents)
         self.ent_xmin = ttk.Entry(axes, width=12); self.ent_xmin.grid(row=1, column=0, padx=(0,6))
         self.ent_xmax = ttk.Entry(axes, width=12); self.ent_xmax.grid(row=1, column=1)
         self.ent_ymin = ttk.Entry(axes, width=12); self.ent_ymin.grid(row=3, column=0, padx=(0,6))
         self.ent_ymax = ttk.Entry(axes, width=12); self.ent_ymax.grid(row=3, column=1)
 
-        btns_axes = ttk.Frame(self); btns_axes.pack(fill="x")
+        btns_axes = ttk.Frame(self); btns_axes.pack(fill="x", pady=(0,6))
         ttk.Button(btns_axes, text="Apply Axes", command=self._apply_axes).pack(side="left")
         ttk.Button(btns_axes, text="Reset Axes", command=self._reset_axes).pack(side="left", padx=6)
 
@@ -85,52 +97,66 @@ class SettingsPanel(tk.Frame):
         ttk.Button(btns_lines, text="Apply Lines", command=self._apply_lines).pack(side="left")
         ttk.Button(btns_lines, text="Reset Lines to CSV", command=self._reset_lines_to_csv).pack(side="left", padx=6)
 
-        # bottom buttons
+        # Bottom buttons
         ttk.Separator(self, orient="horizontal").pack(fill="x", pady=8)
-        btnrow = ttk.Frame(self); btnrow.pack(fill="x", pady=(8, 2))
+        btnrow = ttk.Frame(self);
+        btnrow.pack(fill="x", pady=(8, 2))
         ttk.Button(btnrow, text="Redraw", command=self.on_redraw).pack(side="left")
         if self.reset_view_cb:
             ttk.Button(btnrow, text="Reset View", command=self.reset_view_cb).pack(side="left", padx=6)
+        if self.save_png_cb:
+            ttk.Button(btnrow, text="Export PNG…", command=self.save_png_cb).pack(side="left", padx=6)
 
         self.pack_propagate(False)
         self._prefill_from_state()
         self._sync_manual_entries()
 
-    # ---------- helpers ----------
+    # ---------------- Helpers ----------------
     def _prefill_from_state(self):
-        """Fill manual axes & line boxes from current state (CSV extents by default)."""
+        """Fill manual axes and line boxes from state (CSV extents by default)."""
         s = self.state
-        # manual axes boxes default to CSV extents (so points are visible)
         def put(entry, val):
             entry.delete(0, "end")
             entry.insert(0, "" if val is None else f"{val:g}")
-        # if manual axes already set, show those; else use data extents
-        x_min = s.x_min_manual if s.use_manual_axes and s.x_min_manual is not None else s.axis_lo
-        x_max = s.x_max_manual if s.use_manual_axes and s.x_max_manual is not None else s.axis_hi
-        y_min = s.y_min_manual if s.use_manual_axes and s.y_min_manual is not None else s.axis_lo
-        y_max = s.y_max_manual if s.use_manual_axes and s.y_max_manual is not None else s.axis_hi
+
+        # Manual axes entries default to data extents so points are visible
+        x_min = s.x_min_manual if (s.use_manual_axes and s.x_min_manual is not None) else s.axis_lo
+        x_max = s.x_max_manual if (s.use_manual_axes and s.x_max_manual is not None) else s.axis_hi
+        y_min = s.y_min_manual if (s.use_manual_axes and s.y_min_manual is not None) else s.axis_lo
+        y_max = s.y_max_manual if (s.use_manual_axes and s.y_max_manual is not None) else s.axis_hi
         put(self.ent_xmin, x_min); put(self.ent_xmax, x_max)
         put(self.ent_ymin, y_min); put(self.ent_ymax, y_max)
 
-        # boundary lines default to CSV min/max
+        # Boundary lines default to CSV-derived min/max
         put(self.ent_temp_min, s.x1_min); put(self.ent_temp_max, s.x1_max)
         put(self.ent_rh_min,   s.x2_min); put(self.ent_rh_max,   s.x2_max)
         put(self.ent_wind_min, s.y1_min); put(self.ent_wind_max, s.y1_max)
         put(self.ent_fuel_min, s.y2_min); put(self.ent_fuel_max, s.y2_max)
 
-    # ---------- event handlers ----------
+        # Time label step
+        self.time_step_var.set(max(1, int(s.time_label_step or 1)))
+
+    def _sync_manual_entries(self):
+        state = "normal" if self.var_use_manual.get() else "disabled"
+        for w in (self.ent_xmin, self.ent_xmax, self.ent_ymin, self.ent_ymax):
+            w.config(state=state)
+
+    # ---------------- Handlers ----------------
     def choose_csv(self):
         path = filedialog.askopenfilename(filetypes=[("CSV files", "*.csv"), ("All files", "*.*")])
-        if not path: return
+        if not path:
+            return
         try:
             df = load_csv_mapped(path)
         except Exception as e:
-            messagebox.showerror("Load error", str(e)); return
+            messagebox.showerror("Load error", str(e))
+            return
         self.state.csv_path = path
         self.state.df = df
         compute_bounds(self.state)
         self.path_lbl.configure(text=path)
-        # Reset view to data extents by default when a new file loads
+
+        # Reset to data extents on new file load
         self.state.use_manual_axes = False
         self._prefill_from_state()
         self.on_redraw()
@@ -144,6 +170,14 @@ class SettingsPanel(tk.Frame):
         self.state.show_time_labels = self.var_show_time.get()
         self.on_redraw()
 
+    def _time_step_changed(self):
+        try:
+            self.state.time_label_step = max(1, int(self.time_step_var.get()))
+        except Exception:
+            self.state.time_label_step = 1
+            self.time_step_var.set(1)
+        self.on_redraw()
+
     def _toggle_grid(self):
         self.state.show_grid = self.var_show_grid.get()
         self.on_redraw()
@@ -152,13 +186,11 @@ class SettingsPanel(tk.Frame):
     def _manual_toggle(self):
         self.state.use_manual_axes = self.var_use_manual.get()
         self._sync_manual_entries()
-        # when turning ON, ensure the boxes are filled (from CSV extents if blank)
         if self.state.use_manual_axes:
-            self._prefill_from_state()
+            self._prefill_from_state()  # fill boxes if they were empty
         self.on_redraw()
 
     def _apply_axes(self):
-        # Only apply if manual is ON
         if not self.var_use_manual.get():
             messagebox.showinfo("Manual axes", "Turn on 'Manual axes' to apply typed limits.")
             return
@@ -183,11 +215,6 @@ class SettingsPanel(tk.Frame):
         self._prefill_from_state()
         self.on_redraw()
 
-    def _sync_manual_entries(self):
-        state = "normal" if self.var_use_manual.get() else "disabled"
-        for w in (self.ent_xmin, self.ent_xmax, self.ent_ymin, self.ent_ymax):
-            w.config(state=state)
-
     # ---- boundary lines
     def _apply_lines(self):
         def parse(entry):
@@ -207,7 +234,6 @@ class SettingsPanel(tk.Frame):
         self.on_redraw()
 
     def _reset_lines_to_csv(self):
-        # Restore line values to CSV-derived min/max
         compute_bounds(self.state)
         self._prefill_from_state()
         self.on_redraw()
