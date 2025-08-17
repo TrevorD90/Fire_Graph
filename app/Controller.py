@@ -1,8 +1,8 @@
 import tkinter as tk
 from tkinter import ttk, filedialog
-from .state import AppState
-from .plot_view import PlotFrame
-from .settings_panel import SettingsPanel
+from app.State import AppState
+from app.Plot_View import PlotFrame
+from app.Settings_Panel import SettingsPanel
 
 def run_app():
     state = AppState()
@@ -41,8 +41,8 @@ def run_app():
 def _menu_open_csv(root, state: AppState):
     # forward to the settings panel’s handler if you prefer;
     # or directly choose here and trigger redraw via a custom event.
-    from .data_loader import load_csv_mapped
-    from .plotter import compute_bounds
+    from .Data_Loader import load_csv_mapped
+    from .Plotter import compute_bounds
 
     p = filedialog.askopenfilename(
         parent=root,

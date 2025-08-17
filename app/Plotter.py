@@ -1,7 +1,7 @@
 from __future__ import annotations
 import numpy as np
 from matplotlib.axes import Axes
-from .state import AppState
+from .State import AppState
 
 def compute_bounds(state: AppState) -> None:
     df = state.df
@@ -22,57 +22,57 @@ def compute_bounds(state: AppState) -> None:
     state.axis_lo, state.axis_hi = lo - pad, hi + pad
 
 def draw(ax: Axes, state: AppState) -> None:
+    """Draw figure; top/right show full tick scale mirrored from bottom/left.
+       Uses manual axis ranges if enabled."""
     ax.clear()
     df = state.df
 
-    ax.set_xlim(state.axis_lo, state.axis_hi)
-    ax.set_ylim(state.axis_lo, state.axis_hi)
+    # ---- choose axis limits ----
+    if state.use_manual_axes and None not in (state.x_min_manual, state.x_max_manual,
+                                              state.y_min_manual, state.y_max_manual):
+        x_lo, x_hi = float(state.x_min_manual), float(state.x_max_manual)
+        y_lo, y_hi = float(state.y_min_manual), float(state.y_max_manual)
+    else:
+        x_lo = y_lo = state.axis_lo
+        x_hi = y_hi = state.axis_hi
+
+    # Limits & aspect
+    ax.set_xlim(x_lo, x_hi)
+    ax.set_ylim(y_lo, y_hi)
     ax.set_aspect("equal", adjustable="box")
 
-    # ---- 8 boundary lines (only axis connectors) ----
+    # ---- Boundary lines (axis connectors only) ----
     # X1 (Temp) → X2 (RH)
-    ax.plot([state.x1_min, state.x2_min], [state.axis_lo, state.axis_hi], linewidth=2)
-    ax.plot([state.x1_max, state.x2_max], [state.axis_lo, state.axis_hi], linewidth=2, linestyle="--")
+    ax.plot([state.x1_min, state.x2_min], [y_lo, y_hi], linewidth=2)
+    ax.plot([state.x1_max, state.x2_max], [y_lo, y_hi], linewidth=2, linestyle="--")
     # Y1 (Wind) → Y2 (Fuel)
-    ax.plot([state.axis_lo, state.axis_hi], [state.y1_min, state.y2_min], linewidth=2)
-    ax.plot([state.axis_lo, state.axis_hi], [state.y1_max, state.y2_max], linewidth=2, linestyle="--")
-
-    # ---- Annotate min/max values at edges ----
-    box = dict(facecolor="white", alpha=0.7, pad=0.2)
-    ax.annotate(f"Temp min = {state.x1_min:g}", (state.x1_min, state.axis_lo), xytext=(0, -12),
-                textcoords="offset points", ha="center", va="top", fontsize=9, bbox=box)
-    ax.annotate(f"Temp max = {state.x1_max:g}", (state.x1_max, state.axis_lo), xytext=(0, -12),
-                textcoords="offset points", ha="center", va="top", fontsize=9, bbox=box)
-    ax.annotate(f"RH min = {state.x2_min:g}", (state.x2_min, state.axis_hi), xytext=(0, 12),
-                textcoords="offset points", ha="center", va="bottom", fontsize=9, bbox=box)
-    ax.annotate(f"RH max = {state.x2_max:g}", (state.x2_max, state.axis_hi), xytext=(0, 12),
-                textcoords="offset points", ha="center", va="bottom", fontsize=9, bbox=box)
-
-    ax.annotate(f"Wind min = {state.y1_min:g}", (state.axis_lo, state.y1_min), xytext=(-12, 0),
-                textcoords="offset points", ha="right", va="center", fontsize=9, bbox=box)
-    ax.annotate(f"Wind max = {state.y1_max:g}", (state.axis_lo, state.y1_max), xytext=(-12, 0),
-                textcoords="offset points", ha="right", va="center", fontsize=9, bbox=box)
-    ax.annotate(f"Fuel min = {state.y2_min:g}", (state.axis_hi, state.y2_min), xytext=(12, 0),
-                textcoords="offset points", ha="left", va="center", fontsize=9, bbox=box)
-    ax.annotate(f"Fuel max = {state.y2_max:g}", (state.axis_hi, state.y2_max), xytext=(12, 0),
-                textcoords="offset points", ha="left", va="center", fontsize=9, bbox=box)
+    ax.plot([x_lo, x_hi], [state.y1_min, state.y2_min], linewidth=2)
+    ax.plot([x_lo, x_hi], [state.y1_max, state.y2_max], linewidth=2, linestyle="--")
 
     # ---- Points (no connectors) ----
     if state.show_x1y1:
-        ax.scatter(df["x1"], df["y1"], s=30)  # Temp vs Wind
+        ax.scatter(df["x1"], df["y1"], s=30)
     if state.show_x2y2:
-        ax.scatter(df["x2"], df["y2"], s=30)  # RH vs Fuel
+        ax.scatter(df["x2"], df["y2"], s=30)
 
-    # ---- Labels / title ----
+    # ---- Axis labels ----
     ax.set_xlabel("Temperature")
     ax.set_ylabel("Wind Speed")
-    ax.annotate("Relative Humidity", xy=(0.5, 1.02), xycoords="axes fraction",
-                ha="center", va="bottom")
-    ax.annotate("Fuel Moisture", xy=(1.02, 0.5), xycoords="axes fraction",
-                ha="left", va="center", rotation=-90)
-    ax.set_title("Inverse Min/Max Connections — Toggle Points, Redraw to Update")
 
-    # boundary legend
+    # Bottom/left ticks: let Matplotlib decide for current limits
+    # Then mirror to top/right so they show a full grid as well.
+    top = ax.secondary_xaxis('top')
+    top.set_xlabel("Relative Humidity")
+    top.set_xticks(ax.get_xticks())
+    top.set_xticklabels([f"{t:g}" for t in ax.get_xticks()])
+
+    right = ax.secondary_yaxis('right')
+    right.set_ylabel("Fuel Moisture")
+    right.set_yticks(ax.get_yticks())
+    right.set_yticklabels([f"{t:g}" for t in ax.get_yticks()])
+
+    # Title & legend
+    ax.set_title("Inverse Min/Max Connections — Full Ticks on X2/Y2 (Zoomable)")
     from matplotlib.lines import Line2D
     legend_items = [
         Line2D([0], [0], linewidth=2, linestyle="-", label="Min boundaries"),

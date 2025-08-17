@@ -1,8 +1,8 @@
 import tkinter as tk
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-from .state import AppState
-from .plotter import draw
+from .State import AppState
+from .Plotter import draw
 
 class PlotFrame(tk.Frame):
     def __init__(self, parent, state: AppState):
