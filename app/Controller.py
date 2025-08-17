@@ -9,7 +9,7 @@ def run_app():
     state = AppState()
 
     root = tk.Tk()
-    root.title("Inverse Axis Plotter")
+    root.title("Fire Starter")
     root.geometry("1100x800")
 
     # Layout containers

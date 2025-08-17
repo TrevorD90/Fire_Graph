@@ -120,7 +120,7 @@ def draw(ax: Axes, state: AppState) -> None:
     right.set_yticklabels([f"{t:g}" for t in ax.get_yticks()])
 
     # --- 8) Legend / title ---
-    ax.set_title("Inverse Min/Max — Zoom/Pan Safe — Nth Time Labels")
+    ax.set_title("Fire Starter")
     from matplotlib.lines import Line2D
     legend_items = [
         Line2D([0], [0], linewidth=2, linestyle="-", label="Min boundaries"),
