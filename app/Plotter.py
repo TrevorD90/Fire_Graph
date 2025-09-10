@@ -53,6 +53,7 @@ def draw(ax: Axes, state: AppState) -> None:
     else:
         ax.set_xlim(state.axis_lo, state.axis_hi)
         ax.set_ylim(state.axis_lo, state.axis_hi)
+        ax.invert_yaxis()
 
     ax.set_aspect("equal", adjustable="box")
     ax.set_axisbelow(True)
@@ -109,15 +110,28 @@ def draw(ax: Axes, state: AppState) -> None:
     ax.set_xlabel("Temperature")
     ax.set_ylabel("Wind Speed")
 
-    top = ax.secondary_xaxis('top')
-    top.set_xlabel("Relative Humidity")
-    top.set_xticks(ax.get_xticks())
-    top.set_xticklabels([f"{t:g}" for t in ax.get_xticks()])
+    # Secondary axes with flipped directions
+    def flip_x(x):
+        return state.axis_lo + state.axis_hi - x
 
-    right = ax.secondary_yaxis('right')
-    right.set_ylabel("Fuel Moisture")
-    right.set_yticks(ax.get_yticks())
-    right.set_yticklabels([f"{t:g}" for t in ax.get_yticks()])
+    def flip_y(y):
+        return state.axis_lo + state.axis_hi - y
+
+    top = ax.secondary_xaxis('top', functions=(flip_x, flip_x))
+    top.set_xlabel("Relative Humidity")  # top X: max→min
+
+    right = ax.secondary_yaxis('right', functions=(flip_y, flip_y))
+    right.set_ylabel("Fuel Moisture")  # right Y: min→max
+
+    # top = ax.secondary_xaxis('top')
+    # top.set_xlabel("Relative Humidity")
+    # top.set_xticks(ax.get_xticks())
+    # top.set_xticklabels([f"{t:g}" for t in ax.get_xticks()])
+    #
+    # right = ax.secondary_yaxis('right')
+    # right.set_ylabel("Fuel Moisture")
+    # right.set_yticks(ax.get_yticks())
+    # right.set_yticklabels([f"{t:g}" for t in ax.get_yticks()])
 
     # --- 8) Legend / title ---
     ax.set_title("Fire Starter")
